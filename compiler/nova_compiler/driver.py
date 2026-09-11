@@ -126,6 +126,16 @@ class NovaCompiler:
             return False, err, None
         t_typecheck_end = time.perf_counter()
 
+        # Do not substitute the host-Python interpreter for a WASI artifact.
+        # The interpreter has the authority of the invoking process, whereas
+        # a WASI guest must start with an explicitly constructed capability
+        # set. Until the Preview 2 component backend and its capability host
+        # exist, failing the build is the only safe behavior.
+        if target in ("wasm", "wasi"):
+            return False, (
+                "WASM/WASI component output is not implemented; refusing to "
+                "emit an interpreter-backed artifact with host authority"), None
+
         from .codegen_c import CodegenUnsupported, compile_to_native
         from .hir import lower_ast_to_hir
         from .mir import lower_hir_to_mir
@@ -135,7 +145,8 @@ class NovaCompiler:
         try:
             hir_mod = lower_ast_to_hir(
                 unit.program.decls,
-                module_name=os.path.splitext(os.path.basename(path))[0])
+                module_name=os.path.splitext(os.path.basename(path))[0],
+                check_result=unit.result)
             lower_hir_to_mir(hir_mod)
         except Exception:  # pragma: no cover - lowering is advisory
             pass
