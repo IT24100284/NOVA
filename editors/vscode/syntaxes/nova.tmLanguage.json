@@ -59,7 +59,7 @@
       "patterns": [
         {
           "name": "keyword.control.nova",
-          "match": "\\b(if|else|while|for|in|match)\\b"
+          "match": "\\b(if|else|while|for|in|match|intent|requires|ensures)\\b"
         },
         {
           "name": "keyword.declaration.nova",

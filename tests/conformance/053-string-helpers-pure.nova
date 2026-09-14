@@ -1,0 +1,11 @@
+//! expect: ok
+//! sig: trim = (String) -> String
+//! sig: split = (String, String) -> List[String]
+//! sig: starts_with = (String, String) -> Bool
+//! sig: ends_with = (String, String) -> Bool
+
+import std.prelude;
+
+fn anchor(s: String) -> Bool ! {} {
+    trim(s) == s && starts_with("nova", "no") == false && ends_with("nova", "va")
+}

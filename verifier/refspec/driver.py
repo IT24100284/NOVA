@@ -112,9 +112,10 @@ def compile_source(text: str, name: str = "<input>",
         modules.append(main_mod)
 
         seen = {"main", "std.prelude"}
-        queue: list[tuple[list[str], Span]] = [
-            (d.path, d.path_span) for d in main_mod.decls
-            if isinstance(d, a.ImportDecl)]
+        queue: list[tuple[list[str], Span]] = []
+        for mod in modules:
+            queue.extend((d.path, d.path_span) for d in mod.decls
+                         if isinstance(d, a.ImportDecl))
         while queue:
             path, span = queue.pop(0)
             dotted = ".".join(path)

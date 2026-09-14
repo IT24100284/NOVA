@@ -20,7 +20,7 @@ fn main(rt: Runtime) -> Int ! {Runtime} {
     // Attenuate runtime capability into sub-capabilities
     let fs = rt.fs();       // Filesystem capability
     let net = rt.net();     // Network capability
-    
+
     // Pass strictly required capability to helper
     process_logs(fs, "/var/log/app.log");
     0
@@ -87,6 +87,43 @@ $$\forall f = (\lambda x.\, e), \quad \text{ReachableCaps}(f) \subseteq \text{Ef
 
 Any capability accessed inside $e$ is surfaced directly in the closure's effect row. Closures cannot act as authority laundromats.
 
+### Return-capability laundering defense
+
+Attack vector 21, captured in `tests/conformance/021-attack-return-capability-value.nova`, is the variation where a function returns a value that _contains_ a capability even though the function body itself does not call the capability:
+
+```nova
+fn escape(c: Clock) -> (() -> Clock) {
+    || c
+}
+```
+
+This is not an authority leak in the effect-row sense. The closure value carries a `Clock` capability as an ordinary value, and the type system therefore exposes that capability in the return type. The crucial point is that the effect row stays empty: the capability is not _used_ by the returned function body; it is merely _carried_ by the closure value.
+
+The verifier treats the two channels separately:
+
+- Capability value flow: ordinary data flow through product types, closures, and returned values.
+- Capability use flow: any method call or effectful operation that touches a capability and therefore enters the effect row.
+
+These are intentionally disjoint. A capability can be present in a value without being used; a capability is only counted as an effect when it is exercised.
+
+```text
+          func : Clock -> (() -> Clock)
+             │
+             ▼
+      +-------------------+
+      | returns closure   |
+      | holds `c` as data |
+      +-------------------+
+             │
+             ▼
+    returned value contains Clock
+    but effect row remains empty
+```
+
+The transitive reachability engine blocks laundering by tracing both the value graph and the effect graph. If a closure or struct field reaches a capability, the checker records the reachable capability in the value's type-level footprint, and if the closure is later invoked that footprint is force-joined into the effect row before the call is accepted. This prevents the classic "return a capability-wrapped closure, claim it is pure" attack from hiding authority behind a different shape.
+
+The rule is not: "values containing capabilities are illegal." The rule is: "capabilities can be stored, returned, and passed around only as values, and all actual _uses_ must still be visible in the effect row." That separation is exactly what makes the defense precise without forbidding ordinary capability-bearing data structures.
+
 ---
 
 ## 5. Package-Level Capability Manifests
@@ -104,6 +141,8 @@ forbidden = ["Filesystem", "Process", "Database"]
 ```
 
 ### Semantic Manifest Diffing
+
 When upgrading a dependency, NOVA compares the capability footprint of the new version:
-* **Safe Patch:** If the dependency uses the same or fewer capabilities, the update is accepted.
-* **Authority Creep / Supply Chain Attack:** If a patch introduces a new capability (e.g., `analytics-lib` suddenly requests `Filesystem`), the build halts and requires explicit user authorization (`tools/manifest-diff.py`).
+
+- **Safe Patch:** If the dependency uses the same or fewer capabilities, the update is accepted.
+- **Authority Creep / Supply Chain Attack:** If a patch introduces a new capability (e.g., `analytics-lib` suddenly requests `Filesystem`), the build halts and requires explicit user authorization (`tools/manifest-diff.py`).

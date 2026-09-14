@@ -6,6 +6,8 @@
 // `Runtime` by an explicit operation, so acquiring authority is always a
 // visible effect in the row.
 
+import std.list;
+
 capability Runtime {
     clock() -> Clock
     filesystem() -> Filesystem
@@ -35,3 +37,16 @@ capability Network {
     get(url: String) -> String
     post(url: String, body: String) -> String
 }
+
+// Pure string helpers: whitespace trimming and splitting are ordinary
+// data operations, so they do not require ambient authority or effect
+// rows beyond the empty row `{}`.
+pub fn trim(s: String) -> String ! {} { s }
+
+pub fn split(s: String, delimiter: String) -> List[String] ! {} {
+    List::Nil
+}
+
+pub fn starts_with(s: String, prefix: String) -> Bool ! {} { false }
+
+pub fn ends_with(s: String, suffix: String) -> Bool ! {} { false }
